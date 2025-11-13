@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Convertidor Markdown a PDF</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Carga de marked.js para parsear Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Carga de html2pdf.js para generar el PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        /* Estilos generales para el contenido en el DOM y en el PDF (Clase pdf-output-content) */
+        /* Usamos Inter para la previsualización y una fuente genérica segura para impresión */
+        #html-preview, .pdf-output-content {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            color: #1f2937; /* Gray-800 */
+        }
+        
+        /* Estilos básicos para el contenido generado: Encabezados */
+        #html-preview h1, .pdf-output-content h1 { 
+            font-size: 2em; 
+            margin-top: 1.5rem; 
+            margin-bottom: 0.5rem; 
+            border-bottom: 2px solid #3b82f6; /* Azul para énfasis */
+            padding-bottom: 0.5rem;
+        }
+        #html-preview h2, .pdf-output-content h2 { 
+            font-size: 1.5em; 
+            margin-top: 1.25rem; 
+            margin-bottom: 0.5rem; 
+        }
+        #html-preview p, .pdf-output-content p { margin-bottom: 1rem; }
+        
+        /* Estilos para listas */
+        #html-preview ul, #html-preview ol, .pdf-output-content ul, .pdf-output-content ol { 
+            margin-left: 2rem; 
+            padding-left: 0;
+            margin-bottom: 1rem; 
+        }
+        #html-preview ul, .pdf-output-content ul { list-style-type: disc; }
+        #html-preview ol, .pdf-output-content ol { list-style-type: decimal; }
+
+        /* Estilos para bloques de código */
+        #html-preview pre, .pdf-output-content pre { 
+            background-color: #e5e7eb; /* Gray-200 */
+            padding: 1rem; 
+            border-radius: 0.5rem; 
+            overflow-x: auto; 
+            margin-bottom: 1rem; 
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+        
+        /* Estilos para Tablas (¡NUEVO!) */
+        #html-preview table, .pdf-output-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1.5rem;
+        }
+        #html-preview th, #html-preview td, .pdf-output-content th, .pdf-output-content td {
+            border: 1px solid #d1d5db; /* Gray-300 */
+            padding: 0.75rem;
+            text-align: left;
+        }
+        #html-preview th, .pdf-output-content th {
+            background-color: #f3f4f6; /* Gray-100 */
+            font-weight: bold;
+        }
+
+        /* Estilo para el contenedor temporal de impresión (para forzar márgenes y ancho) */
+        .pdf-output-content {
+            max-width: 210mm; /* A4 width */
+            margin: auto;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-indigo-700">Markdown a PDF</h1>
+            <p class="text-gray-500 mt-2">Escribe tu contenido en Markdown y conviértelo instantáneamente a un documento PDF.</p>
+        </header>
+
+        <!-- Contenedor Principal: Editor y Previsualización -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- Panel de Entrada de Markdown -->
+            <div class="bg-white shadow-xl rounded-xl p-4 flex flex-col h-[70vh]">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4 border-b pb-2">Editor Markdown</h2>
+                
+                <!-- SECCIÓN PARA CARGAR ARCHIVOS MD (NUEVO) -->
+                <div class="mb-4">
+                    <!-- Input de tipo file oculto, solo acepta archivos .md o .markdown -->
+                    <input type="file" id="file-upload" accept=".md, .markdown" class="hidden">
+                    <!-- Botón visible que hace clic en el input oculto -->
+                    <button type="button" onclick="document.getElementById('file-upload').click()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150 ease-in-out shadow-md">
+                        Cargar Archivo .md
+                    </button>
+                </div>
+                <!-- FIN SECCIÓN CARGA ARCHIVOS -->
+
+                <textarea id="markdown-input" class="flex-grow w-full border border-gray-300 rounded-lg p-3 text-gray-700 focus:ring-indigo-500 focus:border-indigo-500 resize-none font-mono text-sm" placeholder="Escribe tu Markdown aquí..."></textarea>
+            </div>
+
+            <!-- Panel de Previsualización HTML -->
+            <div class="bg-white shadow-xl rounded-xl p-4 flex flex-col h-[70vh]">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4 border-b pb-2">Previsualización (Contenido del PDF)</h2>
+                <!-- El contenido real del PDF se clonará desde este div -->
+                <div id="html-preview" class="flex-grow w-full border border-gray-300 rounded-lg p-3 overflow-y-auto text-gray-800">
+                    <!-- Contenido Markdown parseado aparecerá aquí -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Botón de Conversión -->
+        <div class="text-center mt-8">
+            <button id="convert-button" onclick="convertToPdf()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition duration-200 ease-in-out transform hover:scale-105 disabled:opacity-50" disabled>
+                Generar PDF
+            </button>
+            <p id="loading-message" class="mt-4 text-indigo-600 font-medium hidden">Generando PDF, por favor espera...</p>
+        </div>
+
+    </div>
+
+    <script>
+        // Obtención de elementos del DOM
+        const markdownInput = document.getElementById('markdown-input');
+        const htmlPreview = document.getElementById('html-preview');
+        const convertButton = document.getElementById('convert-button');
+        const loadingMessage = document.getElementById('loading-message');
+        const fileUpload = document.getElementById('file-upload'); // Nuevo elemento
+
+        // Contenido inicial de ejemplo (actualizado con tabla)
+        const initialMarkdown = `# Documento de Ejemplo
+        
+¡Bienvenido al convertidor de Markdown a PDF!
+        
+## Características
+        
+* **Conversión en tiempo real**: Mira el resultado a medida que escribes.
+* **Formato Mejorado**: Se mantienen los tamaños de fuente y espaciado.
+* **Soporte para Tablas**: Las tablas se visualizan con bordes claros.
+* **Diseño adaptable**: Funciona bien en móviles y escritorio.
+        
+### Una Tabla de Muestra
+        
+| Característica | Estado | Notas |
+|:---|:---:|---:|
+| Diseño | Completo | Tailwind CSS |
+| Conversión | Correcta | Marked.js |
+| Exportación | PDF (A4) | html2pdf.js |
+
+### Una Lista Numerada
+        
+1.  Primer punto importante.
+2.  Segundo punto, con \`código inline\`.
+3.  Tercer punto final.
+        
+Puedes usar también **texto en negrita**, *cursiva* o \`bloques de código\`.
+        
+\`\`\`javascript
+function saludo() {
+    console.log("¡Hola mundo!");
+}
+saludo();
+\`\`\`
+        
+¡Pulsa el botón "Generar PDF" para descargar o carga tu propio archivo .md!`;
+
+        markdownInput.value = initialMarkdown;
+
+        // Función para actualizar la previsualización HTML
+        const updatePreview = () => {
+            const markdownText = markdownInput.value;
+            // Usamos marked.parse para convertir Markdown a HTML
+            // Note: marked.js está disponible globalmente a través del CDN
+            htmlPreview.innerHTML = marked.parse(markdownText);
+            
+            // Habilitar el botón si hay contenido
+            convertButton.disabled = markdownText.trim() === '';
+        };
+
+        // Escucha los cambios en el área de texto
+        markdownInput.addEventListener('input', updatePreview);
+
+        // --- NUEVA FUNCIÓN: Lector de Archivos MD ---
+        fileUpload.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) {
+                return;
+            }
+
+            const reader = new FileReader();
+
+            reader.onload = (e) => {
+                // Cargar el contenido en el editor
+                markdownInput.value = e.target.result;
+                // Actualizar la previsualización y el estado del botón
+                updatePreview();
+                // Limpiar el input para que el mismo archivo pueda ser cargado de nuevo si el usuario lo desea
+                event.target.value = null; 
+            };
+
+            reader.onerror = (e) => {
+                console.error("Error al leer el archivo:", e);
+                // Aquí se podría usar un modal simple para informar al usuario sobre el error
+            };
+
+            // Leer el archivo como texto
+            reader.readAsText(file);
+        });
+
+        // Actualizar la previsualización al cargar
+        updatePreview();
+
+
+        // Función principal para la conversión a PDF
+        async function convertToPdf() {
+            // Deshabilitar botón y mostrar mensaje de carga
+            convertButton.disabled = true;
+            loadingMessage.classList.remove('hidden');
+
+            try {
+                // html2pdf.js necesita un elemento del DOM para convertir.
+                
+                // 1. Crear un contenedor temporal para la conversión
+                const tempContainer = document.createElement('div');
+                // IMPORTANTE: Aplicamos la clase que contiene los estilos mejorados para PDF
+                tempContainer.className = 'pdf-output-content'; 
+                
+                // 2. Clonar el contenido actual de la previsualización
+                tempContainer.innerHTML = htmlPreview.innerHTML;
+                
+                // 3. Opciones de configuración para html2pdf
+                const options = {
+                    margin: 10,
+                    filename: 'documento_markdown.pdf',
+                    image: { type: 'jpeg', quality: 0.98 },
+                    // Aumentar la escala de html2canvas a 3 para mayor nitidez
+                    html2canvas: { scale: 3, logging: false }, 
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+
+                // 4. Iniciar la conversión y descarga
+                const worker = html2pdf().set(options).from(tempContainer);
+                
+                // Usa un try/catch dentro de una promesa para manejar la finalización del worker
+                await new Promise((resolve, reject) => {
+                    worker.save().then(resolve).catch(reject);
+                });
+
+            } catch (error) {
+                console.error("Error al generar el PDF:", error);
+                // NOTA: Se evita el uso de alert(), el error se muestra en consola.
+            } finally {
+                // Re-habilitar botón y ocultar mensaje
+                loadingMessage.classList.add('hidden');
+                updatePreview(); // Re-chequea si hay contenido para habilitar/deshabilitar
+            }
+        }
+    </script>
+</body>
+</html>
