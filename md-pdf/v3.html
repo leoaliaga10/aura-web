@@ -73,7 +73,19 @@
         /* Estilo para el contenedor temporal de impresión (para forzar márgenes y ancho) */
         .pdf-output-content {
             max-width: 210mm; /* A4 width */
+            min-height: 297mm; /* A4 height */
             margin: auto;
+            padding: 20mm; /* Márgenes internos para A4 */
+            background-color: white;
+            box-sizing: border-box;
+        }
+        
+        /* Asegurar que el contenido se ajuste al tamaño A4 */
+        @media print {
+            .pdf-output-content {
+                width: 210mm;
+                height: 297mm;
+            }
         }
     </style>
 </head>
@@ -92,16 +104,20 @@
             <div class="bg-white shadow-xl rounded-xl p-4 flex flex-col h-[70vh]">
                 <h2 class="text-2xl font-semibold text-gray-800 mb-4 border-b pb-2">Editor Markdown</h2>
                 
-                <!-- SECCIÓN PARA CARGAR ARCHIVOS MD (NUEVO) -->
-                <div class="mb-4">
+                <!-- SECCIÓN PARA CARGAR Y GUARDAR ARCHIVOS MD -->
+                <div class="mb-4 flex gap-2">
                     <!-- Input de tipo file oculto, solo acepta archivos .md o .markdown -->
                     <input type="file" id="file-upload" accept=".md, .markdown" class="hidden">
                     <!-- Botón visible que hace clic en el input oculto -->
-                    <button type="button" onclick="document.getElementById('file-upload').click()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150 ease-in-out shadow-md">
-                        Cargar Archivo .md
+                    <button type="button" onclick="document.getElementById('file-upload').click()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150 ease-in-out shadow-md">
+                        📁 Cargar Archivo .md
+                    </button>
+                    <!-- Botón para guardar el archivo .md -->
+                    <button type="button" id="save-md-button" onclick="saveMarkdownFile()" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150 ease-in-out shadow-md disabled:opacity-50" disabled>
+                        💾 Guardar .md
                     </button>
                 </div>
-                <!-- FIN SECCIÓN CARGA ARCHIVOS -->
+                <!-- FIN SECCIÓN CARGA Y GUARDADO -->
 
                 <textarea id="markdown-input" class="flex-grow w-full border border-gray-300 rounded-lg p-3 text-gray-700 focus:ring-indigo-500 focus:border-indigo-500 resize-none font-mono text-sm" placeholder="Escribe tu Markdown aquí..."></textarea>
             </div>
@@ -116,12 +132,19 @@
             </div>
         </div>
 
-        <!-- Botón de Conversión -->
-        <div class="text-center mt-8">
-            <button id="convert-button" onclick="convertToPdf()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition duration-200 ease-in-out transform hover:scale-105 disabled:opacity-50" disabled>
-                Generar PDF
-            </button>
-            <p id="loading-message" class="mt-4 text-indigo-600 font-medium hidden">Generando PDF, por favor espera...</p>
+        <!-- Botones de Acción -->
+        <div class="text-center mt-8 space-y-4">
+            <div>
+                <button id="convert-button" onclick="convertToPdf()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition duration-200 ease-in-out transform hover:scale-105 disabled:opacity-50" disabled>
+                    📄 Generar PDF
+                </button>
+                <p id="loading-message" class="mt-4 text-indigo-600 font-medium hidden">Generando PDF, por favor espera...</p>
+            </div>
+            <div>
+                <a href="viewer.html" class="inline-block bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition duration-200 ease-in-out transform hover:scale-105">
+                    📚 Ver Documentación
+                </a>
+            </div>
         </div>
 
     </div>
@@ -132,7 +155,8 @@
         const htmlPreview = document.getElementById('html-preview');
         const convertButton = document.getElementById('convert-button');
         const loadingMessage = document.getElementById('loading-message');
-        const fileUpload = document.getElementById('file-upload'); // Nuevo elemento
+        const fileUpload = document.getElementById('file-upload');
+        const saveMdButton = document.getElementById('save-md-button');
 
         // Contenido inicial de ejemplo (actualizado con tabla)
         const initialMarkdown = `# Documento de Ejemplo
@@ -180,8 +204,10 @@ saludo();
             // Note: marked.js está disponible globalmente a través del CDN
             htmlPreview.innerHTML = marked.parse(markdownText);
             
-            // Habilitar el botón si hay contenido
-            convertButton.disabled = markdownText.trim() === '';
+            // Habilitar los botones si hay contenido
+            const hasContent = markdownText.trim() !== '';
+            convertButton.disabled = !hasContent;
+            saveMdButton.disabled = !hasContent;
         };
 
         // Escucha los cambios en el área de texto
@@ -235,14 +261,25 @@ saludo();
                 // 2. Clonar el contenido actual de la previsualización
                 tempContainer.innerHTML = htmlPreview.innerHTML;
                 
-                // 3. Opciones de configuración para html2pdf
+                // 3. Opciones de configuración para html2pdf con tamaño A4 mejorado
                 const options = {
-                    margin: 10,
+                    margin: [15, 15, 15, 15], // Márgenes en mm: [top, right, bottom, left]
                     filename: 'documento_markdown.pdf',
                     image: { type: 'jpeg', quality: 0.98 },
                     // Aumentar la escala de html2canvas a 3 para mayor nitidez
-                    html2canvas: { scale: 3, logging: false }, 
-                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                    html2canvas: { 
+                        scale: 3, 
+                        logging: false,
+                        useCORS: true,
+                        letterRendering: true
+                    }, 
+                    jsPDF: { 
+                        unit: 'mm', 
+                        format: 'a4', 
+                        orientation: 'portrait',
+                        compress: true
+                    },
+                    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
                 };
 
                 // 4. Iniciar la conversión y descarga
@@ -260,6 +297,58 @@ saludo();
                 // Re-habilitar botón y ocultar mensaje
                 loadingMessage.classList.add('hidden');
                 updatePreview(); // Re-chequea si hay contenido para habilitar/deshabilitar
+            }
+        }
+
+        // Función para guardar el archivo Markdown en el servidor
+        async function saveMarkdownFile() {
+            const markdownText = markdownInput.value.trim();
+            
+            if (!markdownText) {
+                alert('No hay contenido para guardar');
+                return;
+            }
+
+            // Pedir nombre del archivo al usuario
+            const fileName = prompt('Ingresa el nombre del archivo (sin extensión):', 'documento');
+            
+            if (!fileName) {
+                return; // Usuario canceló
+            }
+
+            // Limpiar el nombre del archivo de caracteres no válidos
+            const cleanFileName = fileName.replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
+            const fullFileName = `${cleanFileName}.md`;
+
+            saveMdButton.disabled = true;
+            const originalText = saveMdButton.textContent;
+            saveMdButton.textContent = 'Guardando...';
+
+            try {
+                const response = await fetch('/api/save-md', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        filename: fullFileName,
+                        content: markdownText
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert(`Archivo guardado exitosamente: ${fullFileName}`);
+                } else {
+                    alert(`Error al guardar: ${result.error || 'Error desconocido'}`);
+                }
+            } catch (error) {
+                console.error('Error al guardar el archivo:', error);
+                alert('Error al guardar el archivo. Asegúrate de que el servidor esté ejecutándose.');
+            } finally {
+                saveMdButton.disabled = false;
+                saveMdButton.textContent = originalText;
             }
         }
     </script>

@@ -1,0 +1,23 @@
+{
+  "name": "md-pdf-converter",
+  "version": "1.0.0",
+  "description": "Aplicación para convertir archivos Markdown a PDF y gestionar documentación",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "markdown",
+    "pdf",
+    "converter",
+    "documentation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  }
+}
+
